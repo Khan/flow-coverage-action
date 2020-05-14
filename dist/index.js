@@ -2632,19 +2632,18 @@ function _loadMjsDefault() {
  */
 
 // $FlowFixMe: shhhhh
-__webpack_require__(4285); // flow-uncovered-line
+__webpack_require__(4285);
 
 const checkFile = __webpack_require__(6114);
 
 const sendReport = __webpack_require__(4836);
-const getBaseRef = __webpack_require__(7182);
-const gitChangedFiles = __webpack_require__(4885);
+// const getBaseRef = require('./get-base-ref');
+// const gitChangedFiles = require('./git-changed-files');
 
-async function run(flowBin) {
-    const files = await gitChangedFiles(await getBaseRef(), '.');
-    const jsFiles = files.filter((file) => file.endsWith('.js'));
+async function run(flowBin, filesList) {
+    const jsFiles = filesList.filter((file) => file.endsWith('.js'));
     if (!jsFiles.length) {
-        console.log('No changed files');
+        console.log('No files given');
         return;
     }
     const allAnnotations = [];
@@ -2678,16 +2677,25 @@ const [_, __, flowBin, ...argvFiles] = process.argv;
 
 if (flowBin) {
     // flow-next-uncovered-line
-    run(flowBin).catch((err) => {
+    run(flowBin, argvFiles).catch((err) => {
         console.error(err); // flow-uncovered-line
         process.exit(1);
     });
 } else {
-    // arc lint is running us
-    run(process.env['INPUT_FLOW-BIN']).catch((err) => {
-        console.error(err); // flow-uncovered-line
+    const flowBin = process.env['INPUT_FLOW-BIN'];
+    const filesRaw = process.env['INPUT_FILES'];
+    if (!flowBin) {
+        console.log('Must supply flow-bin argument');
         process.exit(1);
-    });
+    } else if (!filesRaw) {
+        console.log('Must supply "files" argument');
+        process.exit(1);
+    } else {
+        run(flowBin, filesRaw.split(':::')).catch((err) => {
+            console.error(err); // flow-uncovered-line
+            process.exit(1);
+        });
+    }
 }
 
 
@@ -81085,42 +81093,6 @@ webpackEmptyAsyncContext.id = 4884;
 
 /***/ }),
 
-/***/ 4885:
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-// @flow
-const execProm = __webpack_require__(6738);
-const path = __webpack_require__(5622);
-const fs = __webpack_require__(5747);
-
-/**
- * This lists the files that have changed when compared to `base` (a git ref),
- * limited to the files that are a descendent of `cwd`.
- */
-const gitChangedFiles = async (
-    base /*:string*/,
-    cwd /*:string*/,
-) /*: Promise<Array<string>>*/ => {
-    cwd = path.resolve(cwd);
-    const {stdout, stderr} = await execProm(
-        `git diff --name-only ${base} --relative`,
-        {cwd, encoding: 'utf8', rejectOnError: true},
-    );
-    return (
-        stdout
-            .split('\n')
-            .filter(Boolean)
-            .map(name => path.join(cwd, name))
-            // Filter out paths that were deleted
-            .filter(path => fs.existsSync(path))
-    );
-};
-
-module.exports = gitChangedFiles;
-
-
-/***/ }),
-
 /***/ 4897:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
@@ -101473,54 +101445,6 @@ module.exports = arrayEach;
 
 /***/ }),
 
-/***/ 6738:
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-// @flow
-/**
- * A simple promisified version of child_process.exec, so we can `await` it
- */
-const {exec} = __webpack_require__(3129);
-
-const bufferToString = (input /*: Buffer | string*/) /*: string*/ => {
-    if (typeof input === 'string') {
-        return input;
-    } else {
-        return input.toString('utf8');
-    }
-};
-
-const execProm = (
-    command /*: string*/,
-    {rejectOnError, ...options} /*: {rejectOnError: boolean} & mixed */ = {},
-) /*: Promise<{err: ?Error, stdout: string, stderr: string}>*/ =>
-    new Promise((res, rej) =>
-        exec(
-            command,
-            // $FlowFixMe
-            options,
-            (err, stdout, stderr) =>
-                err
-                    ? rejectOnError
-                        ? rej(err)
-                        : res({
-                              err,
-                              stdout: bufferToString(stdout),
-                              stderr: bufferToString(stderr),
-                          })
-                    : res({
-                          err: null,
-                          stdout: bufferToString(stdout),
-                          stderr: bufferToString(stderr),
-                      }),
-        ),
-    );
-
-module.exports = execProm;
-
-
-/***/ }),
-
 /***/ 6740:
 /***/ (function(module) {
 
@@ -104849,76 +104773,6 @@ module.exports = function(hljs) {
     ]
   };
 };
-
-/***/ }),
-
-/***/ 7182:
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-// @flow
-/**
- * This is used to determine what the "base" branch for the current work is.
- *
- * - If the `GITHUB_BASE_REF` env variable is present, then we're running
- *   under Github Actions, and we can just use that. If this is being run
- *   locally, then it's a bit more tricky to determine the "base" for this
- *   branch.
- * - If this branch hasn't yet been pushed to github (e.g. the "upstream" is
- *   something local), then use the upstream.
- * - Otherwise, go back through the commits until we find a commit that is part
- *   of another branch, that's either master, develop, or a feature/ branch.
- *   TODO(jared): Consider using the github pull-request API (if we're online)
- *   to determine the base branch.
- */
-const execProm = __webpack_require__(6738);
-
-const getBaseRef = async (head /*:string*/ = 'HEAD') => {
-    if (process.env.GITHUB_BASE_REF) {
-        return `refs/remotes/origin/${process.env.GITHUB_BASE_REF}`;
-    } else {
-        let { stdout: upstream } = await execProm(
-            `git rev-parse --abbrev-ref '${head}@{upstream}'`,
-        );
-        upstream = upstream.trim();
-
-        // if upstream is local and not empty, use that.
-        if (upstream && !upstream.trim().startsWith('origin/')) {
-            return `refs/heads/${upstream}`;
-        }
-        let { stdout: headRef } = await execProm(
-            `git rev-parse --abbrev-ref ${head}`,
-        );
-        headRef = headRef.trim();
-        for (let i = 1; i < 100; i++) {
-            const { stdout } = await execProm(
-                `git branch --contains ${head}~${i} --format='%(refname)'`,
-            );
-            let lines = stdout.split('\n').filter(Boolean);
-            lines = lines.filter((line) => line !== `refs/heads/${headRef}`);
-
-            // Note (Lilli): When running our actions locally, we want to be a little more
-            // aggressive in choosing a baseRef, going back to a shared commit on only `develop`,
-            // `master`, feature or release branches, so that we can cover more commits. In case,
-            // say, I create a bunch of experimental, first-attempt, throw-away branches that
-            // share commits higher in my stack...
-            for (const line of lines) {
-                if (
-                    line === 'refs/heads/develop' ||
-                    line === 'refs/heads/master' ||
-                    line.startsWith('refs/heads/feature/') ||
-                    line.startsWith('refs/heads/release/')
-                ) {
-                    return line;
-                }
-            }
-        }
-        // If all else fails, just use upstream
-        return `${head}@{upstream}`;
-    }
-};
-
-module.exports = getBaseRef;
-
 
 /***/ }),
 

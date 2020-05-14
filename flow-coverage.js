@@ -15,14 +15,13 @@ require('@babel/register'); // flow-uncovered-line
 const checkFile = require('./flow-coverage-linter');
 
 const sendReport = require('./send-report');
-const getBaseRef = require('./get-base-ref');
-const gitChangedFiles = require('./git-changed-files');
+// const getBaseRef = require('./get-base-ref');
+// const gitChangedFiles = require('./git-changed-files');
 
-async function run(flowBin) {
-    const files = await gitChangedFiles(await getBaseRef(), '.');
-    const jsFiles = files.filter((file) => file.endsWith('.js'));
+async function run(flowBin, filesList) {
+    const jsFiles = filesList.filter((file) => file.endsWith('.js'));
     if (!jsFiles.length) {
-        console.log('No changed files');
+        console.log('No files given');
         return;
     }
     const allAnnotations = [];
@@ -56,14 +55,23 @@ const [_, __, flowBin, ...argvFiles] = process.argv;
 
 if (flowBin) {
     // flow-next-uncovered-line
-    run(flowBin).catch((err) => {
+    run(flowBin, argvFiles).catch((err) => {
         console.error(err); // flow-uncovered-line
         process.exit(1);
     });
 } else {
-    // arc lint is running us
-    run(process.env['INPUT_FLOW-BIN']).catch((err) => {
-        console.error(err); // flow-uncovered-line
+    const flowBin = process.env['INPUT_FLOW-BIN'];
+    const filesRaw = process.env['INPUT_FILES'];
+    if (!flowBin) {
+        console.log('Must supply flow-bin argument');
         process.exit(1);
-    });
+    } else if (!filesRaw) {
+        console.log('Must supply "files" argument');
+        process.exit(1);
+    } else {
+        run(flowBin, filesRaw.split(':::')).catch((err) => {
+            console.error(err); // flow-uncovered-line
+            process.exit(1);
+        });
+    }
 }
