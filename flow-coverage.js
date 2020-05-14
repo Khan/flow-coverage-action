@@ -10,7 +10,7 @@
  */
 
 // $FlowFixMe: shhhhh
-require('@babel/register'); // flow-uncovered-line
+require('@babel/register');
 
 const checkFile = require('./flow-coverage-linter');
 
@@ -54,9 +54,8 @@ const runArcanist = async (flowBin, files) => {
 const [_, __, flowBin, ...argvFiles] = process.argv;
 
 if (flowBin) {
-    // flow-next-uncovered-line
     run(flowBin, argvFiles).catch((err) => {
-        console.error(err); // flow-uncovered-line
+        console.error(err);
         process.exit(1);
     });
 } else {
