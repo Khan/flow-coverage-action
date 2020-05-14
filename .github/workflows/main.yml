@@ -9,9 +9,9 @@ jobs:
         name: '▶️ Setup checkout: get the repo'
       - run: yarn
         name: '▶️ Setup yarn: install dependencies'
-      - uses: Khan/files-changed-action@master
+      - uses: Khan/files-changed-action@efb52665cf20dce962998c4ebee48f387ea5603f
         id: files
-      - uses: Khan/flow-coverage-action@with-files
+      - uses: Khan/flow-coverage-action@example-wrong
         with:
           jest-bin: ./node_modules/.bin/jest
           files: ${{ steps.files.outputs.files }}
