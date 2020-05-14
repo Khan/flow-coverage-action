@@ -13,7 +13,7 @@ jobs:
         id: files
       - uses: Khan/flow-coverage-action@example-wrong
         with:
-          jest-bin: ./node_modules/.bin/jest
+          flow-bin: ./node_modules/.bin/flow
           files: ${{ steps.files.outputs.files }}
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
