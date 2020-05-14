@@ -9,8 +9,10 @@ jobs:
         name: '▶️ Setup checkout: get the repo'
       - run: yarn
         name: '▶️ Setup yarn: install dependencies'
-      - uses: Khan/files-changed-action@3d02b8ad3c740f95fdaa9e7aea85bcfdb8867bb5
+      - uses: Khan/files-changed-action@master
         id: files
+        with:
+          ignore: dist/*
       - uses: Khan/flow-coverage-action@example-wrong
         with:
           flow-bin: ./node_modules/.bin/flow
