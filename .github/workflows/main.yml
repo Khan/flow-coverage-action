@@ -12,7 +12,7 @@ jobs:
       - uses: Khan/files-changed-action@master
         id: files
         with:
-          ignore: dist/*
+          ignore: '**/dist/*'
       - uses: Khan/flow-coverage-action@example-wrong
         with:
           flow-bin: ./node_modules/.bin/flow
