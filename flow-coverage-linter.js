@@ -126,11 +126,7 @@ const collectWarnings = (fileName, lineStats, uncoveredLocs) => {
                     start,
                     end,
                     annotationLevel: 'failure',
-                    message: `The expression from ${start.line}:${
-                        start.column
-                    }-${end.line}:${
-                        end.column
-                    } is not covered by flow! If it's unavoidable, surround the expression in '/* flow-uncovered-block */' and '/* end flow-uncovered-block */'`,
+                    message: `The expression from ${start.line}:${start.column}-${end.line}:${end.column} is not covered by flow! If it's unavoidable, surround the expression in '/* flow-uncovered-block */' and '/* end flow-uncovered-block */'`,
                     offset: start.offset,
                 });
             }
@@ -207,7 +203,7 @@ const getCoverage = (flowBin, filePath) => {
     return data;
 };
 
-const isUncoveredFile = sourceText =>
+const isUncoveredFile = (sourceText) =>
     sourceText.split('\n').includes('/* flow-uncovered-file */');
 
 const checkFile = (flowBin /*: string */, filePath /*: string */) => {
@@ -223,21 +219,34 @@ const checkFile = (flowBin /*: string */, filePath /*: string */) => {
         return [];
     }
 
-    const data = getCoverage(flowBin, filePath);
-    if (!data.expressions.uncovered_count) {
-        // All clear!
-        return [];
-    }
+    try {
+        const data = getCoverage(flowBin, filePath);
+        if (!data.expressions.uncovered_count) {
+            // All clear!
+            return [];
+        }
 
-    const ignoredLinesAndPositions = findIgnoredLinesAndPositions(
-        filePath,
-        sourceText,
-    );
-    return collectWarnings(
-        filePath,
-        ignoredLinesAndPositions,
-        data.expressions.uncovered_locs,
-    );
+        const ignoredLinesAndPositions = findIgnoredLinesAndPositions(
+            filePath,
+            sourceText,
+        );
+        return collectWarnings(
+            filePath,
+            ignoredLinesAndPositions,
+            data.expressions.uncovered_locs,
+        );
+    } catch (err) {
+        return [
+            {
+                path: filePath,
+                start: {line: 0, column: 0},
+                end: {line: 0, column: 0},
+                annotationLevel: 'failure',
+                message: `Unable to run flow coverage: ` + err.message,
+                offset: 0,
+            },
+        ];
+    }
 };
 
 module.exports = checkFile;

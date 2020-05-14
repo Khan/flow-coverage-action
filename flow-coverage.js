@@ -32,25 +32,6 @@ async function run(flowBin, filesList) {
     await sendReport('Flow-coverage', allAnnotations);
 }
 
-// Deprecated -- included for backwards compatability with arcanist, until
-// we get completely off of phabricator.
-const runArcanist = async (flowBin, files) => {
-    //let failed = false; // MUSTDO (Lilli to Jared): Was there plans to do something with this variable or can we delete it? jared: "oh yeah I was gonna have the exit code match the failed status"
-    for (const filePath of files) {
-        const warnings = await checkFile(flowBin, filePath);
-        if (!warnings.length) {
-            continue;
-        }
-        //failed = true;
-
-        warnings.forEach((warning) => {
-            console.log(
-                `${warning.path}:::${warning.message}:::${warning.offset}`,
-            );
-        });
-    }
-};
-
 const [_, __, flowBin, ...argvFiles] = process.argv;
 
 if (flowBin) {
