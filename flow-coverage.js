@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // @flow
 
 /**
@@ -9,16 +8,11 @@
  * UI).
  */
 
-// $FlowFixMe: shhhhh
-require('@babel/register');
+import checkFile from './flow-coverage-linter';
+import sendReport from 'actions-utils/send-report';
+import fs from 'fs';
 
-const checkFile = require('./flow-coverage-linter');
-
-const sendReport = require('./send-report');
-// const getBaseRef = require('./get-base-ref');
-// const gitChangedFiles = require('./git-changed-files');
-
-async function run(flowBin, filesList) {
+async function run(flowBin: string, filesList: Array<string>) {
     const jsFiles = filesList.filter((file) => file.endsWith('.js'));
     if (!jsFiles.length) {
         console.log('No files given');
@@ -40,8 +34,11 @@ if (flowBin) {
         process.exit(1);
     });
 } else {
-    const flowBin = process.env['INPUT_FLOW-BIN'];
-    const filesRaw = process.env['INPUT_FILES'];
+    let flowBin = process.env['INPUT_FLOW-BIN'];
+    let filesRaw = process.env['INPUT_FILES'];
+    if (!flowBin && fs.existsSync('node_modules/.bin/flow')) {
+        flowBin = 'node_modules/.bin/flow';
+    }
     if (!flowBin) {
         console.log('Must supply flow-bin argument');
         process.exit(1);

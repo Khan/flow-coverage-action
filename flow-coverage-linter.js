@@ -1,18 +1,18 @@
 // @flow
 
-const {execSync} = require('child_process');
-const path = require('path');
+import {execSync} from 'child_process';
+import path from 'path';
 
-const fs = require('fs');
+import fs from 'fs';
 
 // Allows text after comment explaining why
 const flowUncoveredLineRegex = /(\/\/\s*flow-uncovered-line[\s:]?.*|\/\*\s*flow-uncovered-line(\s+[^*]*)?\*\/)/;
 const flowNextUncoveredLineRegex = /(\/\/\s*flow-(next-uncovered|uncovered-next)-line|\/\*\s*flow-(next-uncovered|uncovered-next)-line(\s+[^*]*)?\*\/)/;
 
-const findIgnoredLinesAndPositions = (path, text) => {
+const findIgnoredLinesAndPositions = (path: string, text: string) => {
     const lines = text.split('\n');
-    const ignored /*: {[key: number]: boolean} */ = {};
-    const lineOffsets /*: {[key: number]: number} */ = {};
+    const ignored: {[key: number]: boolean} = {};
+    const lineOffsets: {[key: number]: number} = {};
     const ignoreBlocks = [];
     const unmatchedBlocks = [];
     let ignoring = false;
@@ -58,16 +58,16 @@ const findIgnoredLinesAndPositions = (path, text) => {
 };
 
 const collectWarnings = (fileName, lineStats, uncoveredLocs) => {
-    const alreadyWarned /*: {[key: number]: boolean} */ = {};
-    const errorExists /*: {[key: number]: boolean} */ = {};
-    const warnings /*: Array<{
+    const alreadyWarned: {[key: number]: boolean} = {};
+    const errorExists: {[key: number]: boolean} = {};
+    const warnings: Array<{
         path: string,
         start: {line: number, column: number},
         end: {line: number, column: number},
         annotationLevel: 'warning' | 'failure',
         message: string,
         offset: number,
-    }> */ = [];
+    }> = [];
     const {
         ignoredLines,
         ignoredBlocks,
@@ -133,7 +133,7 @@ const collectWarnings = (fileName, lineStats, uncoveredLocs) => {
         }
     });
     let passable = 0;
-    let currentBlock /*: ?[number, number] */ = ignoredBlocks.shift();
+    let currentBlock: ?[number, number] = ignoredBlocks.shift();
     for (let line = 1; line <= numLines; line++) {
         if (ignoredLines[line] && !errorExists[line]) {
             if (
@@ -181,24 +181,22 @@ const collectWarnings = (fileName, lineStats, uncoveredLocs) => {
     return warnings;
 };
 
-/*::
 type CoverageInfo = {|
-        expressions: {|
-            uncovered_count: number,
-            covered_count: number,
-            uncovered_locs: $ReadOnlyArray<{|
-                start: {line: number, column: number, offset: number},
-                end: {line: number, column: number, offset: number},
-            |}>,
-        |},
-    |}
-*/
+    expressions: {|
+        uncovered_count: number,
+        covered_count: number,
+        uncovered_locs: $ReadOnlyArray<{|
+            start: {line: number, column: number, offset: number},
+            end: {line: number, column: number, offset: number},
+        |}>,
+    |},
+|};
 
 const getCoverage = (flowBin, filePath) => {
     const stdout = execSync(
         path.resolve(flowBin) + ` coverage --json ${filePath}`,
     ).toString('utf8');
-    const data /*: CoverageInfo */ = JSON.parse(stdout); // flow-uncovered-line
+    const data: CoverageInfo = JSON.parse(stdout); // flow-uncovered-line
 
     return data;
 };

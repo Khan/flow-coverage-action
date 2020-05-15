@@ -1,15 +1,15 @@
 name: 'Flow Coverage Linter'
 description: 'Check to make sure all your code is really covered!'
 runs:
-  using: 'node12'
-  main: 'dist/index.js'
+  using: 'node10'
+  main: 'dist/flow-coverage.js'
 inputs:
   files:
     required: true
     description: Pass in a list of files to check (separated by ':::')! Probably from files-changed-action
   flow-bin:
-    required: true
-    description: 'Path to your flow binary, probably node_modules/.bin/flow'
+    required: false
+    description: 'Path to your flow binary, defaults to node_modules/.bin/flow'
 branding:
   icon: check-circle
   color: red

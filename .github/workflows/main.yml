@@ -6,14 +6,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-        name: '▶️ Setup checkout: get the repo'
       - run: yarn
-        name: '▶️ Setup yarn: install dependencies'
       - uses: Khan/files-changed-action@master
         id: files
       - uses: Khan/flow-coverage-action@example-wrong
         with:
-          flow-bin: ./node_modules/.bin/flow
           files: ${{ steps.files.outputs.files }}
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'

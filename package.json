@@ -6,16 +6,23 @@
     "author": "Jared Forsyth <jared@jaredforsyth.com>",
     "license": "MIT",
     "scripts": {
-        "dist": "ncc build flow-coverage.js"
+        "dist": "parcel build --target=node flow-coverage.js"
+    },
+    "engines": {
+        "node": "10"
     },
     "dependencies": {
         "@actions/github": "^2.1.1",
         "@babel/core": "^7.9.6",
         "@babel/register": "^7.9.0",
         "@zeit/ncc": "^0.22.1",
+        "actions-utils": "Khan/actions-utils#send-report",
         "chalk": "^4.0.0",
         "cli-highlight": "^2.1.4",
         "flow-bin": "^0.123.0",
         "metro-react-native-babel-preset": "^0.59.0"
+    },
+    "devDependencies": {
+        "parcel": "^1.12.4"
     }
 }
