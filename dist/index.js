@@ -2654,31 +2654,11 @@ async function run(flowBin, filesList) {
     await sendReport('Flow-coverage', allAnnotations);
 }
 
-// Deprecated -- included for backwards compatability with arcanist, until
-// we get completely off of phabricator.
-const runArcanist = async (flowBin, files) => {
-    //let failed = false; // MUSTDO (Lilli to Jared): Was there plans to do something with this variable or can we delete it? jared: "oh yeah I was gonna have the exit code match the failed status"
-    for (const filePath of files) {
-        const warnings = await checkFile(flowBin, filePath);
-        if (!warnings.length) {
-            continue;
-        }
-        //failed = true;
-
-        warnings.forEach((warning) => {
-            console.log(
-                `${warning.path}:::${warning.message}:::${warning.offset}`,
-            );
-        });
-    }
-};
-
 const [_, __, flowBin, ...argvFiles] = process.argv;
 
 if (flowBin) {
-    // flow-next-uncovered-line
     run(flowBin, argvFiles).catch((err) => {
-        console.error(err); // flow-uncovered-line
+        console.error(err);
         process.exit(1);
     });
 } else {
@@ -80082,6 +80062,23 @@ const removeWorkspace = (path /*: string*/) => {
     return path;
 };
 
+const newGithubReport = async (
+    // title/*:string*/,
+    messages /*:Array<Message>*/,
+) => {
+    // echo "::warning file=app.js,line=1,col=5::Missing semicolon"
+    // echo "::error file=app.js,line=10,col=15::Something went wrong"
+    messages.forEach((message) => {
+        console.log(
+            `::${
+                message.annotationLevel === 'failure' ? 'error' : 'warning'
+            } file=${message.path},line=${message.start.line},col=${
+                message.start.column
+            }::${message.message}`,
+        );
+    });
+};
+
 /**
  * Report out these errors to github, by making a new "check" and uploading
  * the messages as annotations.
@@ -80150,7 +80147,8 @@ const makeReport = (title /*: string*/, messages /*: Array<Message>*/) => {
         return;
     }
     if (GITHUB_TOKEN) {
-        return githubReport(title, GITHUB_TOKEN, messages);
+        // return githubReport(title, GITHUB_TOKEN, messages);
+        return newGithubReport(messages);
     } else {
         return localReport(title, messages);
     }
@@ -96584,11 +96582,7 @@ const collectWarnings = (fileName, lineStats, uncoveredLocs) => {
                     start,
                     end,
                     annotationLevel: 'failure',
-                    message: `The expression from ${start.line}:${
-                        start.column
-                    }-${end.line}:${
-                        end.column
-                    } is not covered by flow! If it's unavoidable, surround the expression in '/* flow-uncovered-block */' and '/* end flow-uncovered-block */'`,
+                    message: `The expression from ${start.line}:${start.column}-${end.line}:${end.column} is not covered by flow! If it's unavoidable, surround the expression in '/* flow-uncovered-block */' and '/* end flow-uncovered-block */'`,
                     offset: start.offset,
                 });
             }
@@ -96665,7 +96659,7 @@ const getCoverage = (flowBin, filePath) => {
     return data;
 };
 
-const isUncoveredFile = sourceText =>
+const isUncoveredFile = (sourceText) =>
     sourceText.split('\n').includes('/* flow-uncovered-file */');
 
 const checkFile = (flowBin /*: string */, filePath /*: string */) => {
@@ -96681,21 +96675,34 @@ const checkFile = (flowBin /*: string */, filePath /*: string */) => {
         return [];
     }
 
-    const data = getCoverage(flowBin, filePath);
-    if (!data.expressions.uncovered_count) {
-        // All clear!
-        return [];
-    }
+    try {
+        const data = getCoverage(flowBin, filePath);
+        if (!data.expressions.uncovered_count) {
+            // All clear!
+            return [];
+        }
 
-    const ignoredLinesAndPositions = findIgnoredLinesAndPositions(
-        filePath,
-        sourceText,
-    );
-    return collectWarnings(
-        filePath,
-        ignoredLinesAndPositions,
-        data.expressions.uncovered_locs,
-    );
+        const ignoredLinesAndPositions = findIgnoredLinesAndPositions(
+            filePath,
+            sourceText,
+        );
+        return collectWarnings(
+            filePath,
+            ignoredLinesAndPositions,
+            data.expressions.uncovered_locs,
+        );
+    } catch (err) {
+        return [
+            {
+                path: filePath,
+                start: {line: 0, column: 0},
+                end: {line: 0, column: 0},
+                annotationLevel: 'failure',
+                message: `Unable to run flow coverage: ` + err.message,
+                offset: 0,
+            },
+        ];
+    }
 };
 
 module.exports = checkFile;
