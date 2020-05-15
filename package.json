@@ -9,11 +9,11 @@
         "dist": "ncc build flow-coverage.js"
     },
     "dependencies": {
-        "actions-utils": "Khan/actions-utils#gitattributes",
         "@actions/github": "^2.1.1",
         "@babel/core": "^7.9.6",
         "@babel/register": "^7.9.0",
         "@zeit/ncc": "^0.22.1",
+        "actions-utils": "Khan/actions-utils#gitattributes",
         "chalk": "^4.0.0",
         "cli-highlight": "^2.1.4",
         "flow-bin": "^0.123.0",

@@ -731,7 +731,7 @@
 
 actions-utils@Khan/actions-utils#gitattributes:
   version "1.0.0"
-  resolved "https://codeload.github.com/Khan/actions-utils/tar.gz/0e342e6892bb151ee6ca57696dd7d59db9b89868"
+  resolved "https://codeload.github.com/Khan/actions-utils/tar.gz/123aaa073794f1efd7930872a3374ab5979bbbe3"
   dependencies:
     "@actions/github" "^2.1.1"
     chalk "^4.0.0"
