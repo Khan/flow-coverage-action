@@ -106,6 +106,23 @@ const removeWorkspace = (path /*: string*/) => {
     return path;
 };
 
+const newGithubReport = async (
+    // title/*:string*/,
+    messages /*:Array<Message>*/,
+) => {
+    // echo "::warning file=app.js,line=1,col=5::Missing semicolon"
+    // echo "::error file=app.js,line=10,col=15::Something went wrong"
+    messages.forEach((message) => {
+        console.log(
+            `::${
+                message.annotationLevel === 'failure' ? 'error' : 'warning'
+            } file=${message.path},line=${message.start.line},col=${
+                message.start.column
+            }::${message.message}`,
+        );
+    });
+};
+
 /**
  * Report out these errors to github, by making a new "check" and uploading
  * the messages as annotations.
@@ -174,7 +191,8 @@ const makeReport = (title /*: string*/, messages /*: Array<Message>*/) => {
         return;
     }
     if (GITHUB_TOKEN) {
-        return githubReport(title, GITHUB_TOKEN, messages);
+        // return githubReport(title, GITHUB_TOKEN, messages);
+        return newGithubReport(messages);
     } else {
         return localReport(title, messages);
     }
