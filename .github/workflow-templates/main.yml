@@ -6,6 +6,8 @@ setup:
   checkout:
     - uses: actions/checkout@v1
   yarn:
+    setup: checkout
+    steps:
     - run: yarn
 
 jobs:
