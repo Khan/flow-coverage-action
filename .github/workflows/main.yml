@@ -11,8 +11,6 @@ jobs:
         name: '▶️ Setup yarn: install dependencies'
       - uses: Khan/files-changed-action@master
         id: files
-        with:
-          ignore: '**/dist/*'
       - uses: Khan/flow-coverage-action@example-wrong
         with:
           flow-bin: ./node_modules/.bin/flow
