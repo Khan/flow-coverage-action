@@ -12,14 +12,19 @@
 // $FlowFixMe: shhhhh
 require('@babel/register'); // flow-uncovered-line
 
+const sendReport = require('actions-utils/send-report');
+const getBaseRef = require('actions-utils/get-base-ref');
+const gitChangedFiles = require('actions-utils/git-changed-files');
+
 const checkFile = require('./flow-coverage-linter');
 
-const sendReport = require('./send-report');
-const getBaseRef = require('./get-base-ref');
-const gitChangedFiles = require('./git-changed-files');
-
 async function run(flowBin) {
-    const files = await gitChangedFiles(await getBaseRef(), '.');
+    const baseRef = await getBaseRef();
+    if (!baseRef) {
+        console.log('Unable to determine base ref');
+        return;
+    }
+    const files = await gitChangedFiles(baseRef, '.');
     const jsFiles = files.filter((file) => file.endsWith('.js'));
     if (!jsFiles.length) {
         console.log('No changed files');
@@ -33,37 +38,19 @@ async function run(flowBin) {
     await sendReport('Flow-coverage', allAnnotations);
 }
 
-// Deprecated -- included for backwards compatability with arcanist, until
-// we get completely off of phabricator.
-const runArcanist = async (flowBin, files) => {
-    //let failed = false; // MUSTDO (Lilli to Jared): Was there plans to do something with this variable or can we delete it? jared: "oh yeah I was gonna have the exit code match the failed status"
-    for (const filePath of files) {
-        const warnings = await checkFile(flowBin, filePath);
-        if (!warnings.length) {
-            continue;
-        }
-        //failed = true;
-
-        warnings.forEach((warning) => {
-            console.log(
-                `${warning.path}:::${warning.message}:::${warning.offset}`,
-            );
-        });
+const getFlowBin = () => {
+    if (process.env['INPUT_FLOW-BIN']) {
+        return process.env['INPUT_FLOW-BIN'];
     }
+    const guess = path.resolve('node_modules/.bin/flow');
+    if (fs.existsSync(guess)) {
+        return guess;
+    }
+    console.error('No flow-bin found (pass in as an input)');
+    process.exit(1);
 };
 
-const [_, __, flowBin, ...argvFiles] = process.argv;
-
-if (flowBin) {
-    // flow-next-uncovered-line
-    run(flowBin).catch((err) => {
-        console.error(err); // flow-uncovered-line
-        process.exit(1);
-    });
-} else {
-    // arc lint is running us
-    run(process.env['INPUT_FLOW-BIN']).catch((err) => {
-        console.error(err); // flow-uncovered-line
-        process.exit(1);
-    });
-}
+run(getFlowBin()).catch((err) => {
+    console.error(err); // flow-uncovered-line
+    process.exit(1);
+});

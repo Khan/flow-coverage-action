@@ -2634,14 +2634,19 @@ function _loadMjsDefault() {
 // $FlowFixMe: shhhhh
 __webpack_require__(4285); // flow-uncovered-line
 
+const sendReport = __webpack_require__(1876);
+const getBaseRef = __webpack_require__(254);
+const gitChangedFiles = __webpack_require__(5042);
+
 const checkFile = __webpack_require__(6114);
 
-const sendReport = __webpack_require__(4836);
-const getBaseRef = __webpack_require__(7182);
-const gitChangedFiles = __webpack_require__(4885);
-
 async function run(flowBin) {
-    const files = await gitChangedFiles(await getBaseRef(), '.');
+    const baseRef = await getBaseRef();
+    if (!baseRef) {
+        console.log('Unable to determine base ref');
+        return;
+    }
+    const files = await gitChangedFiles(baseRef, '.');
     const jsFiles = files.filter((file) => file.endsWith('.js'));
     if (!jsFiles.length) {
         console.log('No changed files');
@@ -2655,40 +2660,106 @@ async function run(flowBin) {
     await sendReport('Flow-coverage', allAnnotations);
 }
 
-// Deprecated -- included for backwards compatability with arcanist, until
-// we get completely off of phabricator.
-const runArcanist = async (flowBin, files) => {
-    //let failed = false; // MUSTDO (Lilli to Jared): Was there plans to do something with this variable or can we delete it? jared: "oh yeah I was gonna have the exit code match the failed status"
-    for (const filePath of files) {
-        const warnings = await checkFile(flowBin, filePath);
-        if (!warnings.length) {
-            continue;
-        }
-        //failed = true;
+const getFlowBin = () => {
+    if (process.env['INPUT_FLOW-BIN']) {
+        return process.env['INPUT_FLOW-BIN'];
+    }
+    const guess = path.resolve('node_modules/.bin/flow');
+    if (fs.existsSync(guess)) {
+        return guess;
+    }
+    console.error('No flow-bin found (pass in as an input)');
+    process.exit(1);
+};
 
-        warnings.forEach((warning) => {
-            console.log(
-                `${warning.path}:::${warning.message}:::${warning.offset}`,
-            );
+run(getFlowBin()).catch((err) => {
+    console.error(err); // flow-uncovered-line
+    process.exit(1);
+});
+
+
+/***/ }),
+
+/***/ 254:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+// @flow
+/**
+ * This is used to determine what the "base" branch for the current work is.
+ *
+ * - If the `GITHUB_BASE_REF` env variable is present, then we're running
+ *   under Github Actions, and we can just use that. If this is being run
+ *   locally, then it's a bit more tricky to determine the "base" for this
+ *   branch.
+ * - If this branch hasn't yet been pushed to github (e.g. the "upstream" is
+ *   something local), then use the upstream.
+ * - Otherwise, go back through the commits until we find a commit that is part
+ *   of another branch, that's either master, develop, or a feature/ branch.
+ *   TODO(jared): Consider using the github pull-request API (if we're online)
+ *   to determine the base branch.
+ */
+const { execSync } = __webpack_require__(3129);
+
+const getBaseRef = async (head /*:string*/ = 'HEAD') => {
+    const { GITHUB_BASE_REF } = process.env;
+    if (GITHUB_BASE_REF) {
+        if (GITHUB_BASE_REF.startsWith('refs/')) {
+            return GITHUB_BASE_REF;
+        } else {
+            return `refs/remotes/origin/${GITHUB_BASE_REF}`;
+        }
+    } else {
+        let upstream = execSync(
+            `git rev-parse --abbrev-ref '${head}@{upstream}'`,
+            { encoding: 'utf8' },
+        );
+        upstream = upstream.trim();
+
+        // if upstream is local and not empty, use that.
+        if (upstream && !upstream.trim().startsWith('origin/')) {
+            return `refs/heads/${upstream}`;
+        }
+        let headRef = execSync(`git rev-parse --abbrev-ref ${head}`, {
+            encoding: 'utf8',
         });
+        headRef = headRef.trim();
+        for (let i = 1; i < 100; i++) {
+            try {
+                const stdout = execSync(
+                    `git branch --contains ${head}~${i} --format='%(refname)'`,
+                    { encoding: 'utf8' },
+                );
+                let lines = stdout.split('\n').filter(Boolean);
+                lines = lines.filter(
+                    (line) => line !== `refs/heads/${headRef}`,
+                );
+
+                // Note (Lilli): When running our actions locally, we want to be a little more
+                // aggressive in choosing a baseRef, going back to a shared commit on only `develop`,
+                // `master`, feature or release branches, so that we can cover more commits. In case,
+                // say, I create a bunch of experimental, first-attempt, throw-away branches that
+                // share commits higher in my stack...
+                for (const line of lines) {
+                    if (
+                        line === 'refs/heads/develop' ||
+                        line === 'refs/heads/master' ||
+                        line.startsWith('refs/heads/feature/') ||
+                        line.startsWith('refs/heads/release/')
+                    ) {
+                        return line;
+                    }
+                }
+            } catch {
+                // Ran out of history, probably
+                return null;
+            }
+        }
+        // We couldn't find it
+        return null;
     }
 };
 
-const [_, __, flowBin, ...argvFiles] = process.argv;
-
-if (flowBin) {
-    // flow-next-uncovered-line
-    run(flowBin).catch((err) => {
-        console.error(err); // flow-uncovered-line
-        process.exit(1);
-    });
-} else {
-    // arc lint is running us
-    run(process.env['INPUT_FLOW-BIN']).catch((err) => {
-        console.error(err); // flow-uncovered-line
-        process.exit(1);
-    });
-}
+module.exports = getBaseRef;
 
 
 /***/ }),
@@ -38002,6 +38073,196 @@ function keys(object) {
 }
 
 module.exports = keys;
+
+
+/***/ }),
+
+/***/ 1876:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+// @flow
+
+/**
+ * The goal of this "action runner" is to allow running "locally"
+ * or in a github action.
+ *
+ * Local running writes to stdout
+ * Github running creates a github check.
+ *
+ * And we distinguish between the two by the presence or absence of
+ * the GITHUB_TOKEN env variable.
+ */
+
+const {GITHUB_TOKEN, GITHUB_WORKSPACE} = process.env;
+const fs = __webpack_require__(5747);
+const path = __webpack_require__(5622);
+const chalk = __webpack_require__(1843);
+/* flow-uncovered-block */
+// TODO(jared): Strip this out somehow to make this lighter weight
+const highlight /*: (string, {language: string, ignoreIllegals: boolean}) => string */ = __webpack_require__(3227)
+    .highlight;
+/* end flow-uncovered-block */
+
+/*::
+export type Message = {
+    message: string,
+    start: {line: number, column: number},
+    end: {line: number, column: number},
+    annotationLevel: 'failure' | 'warning',
+    path: string,
+}
+*/
+
+/**
+ * Report out these error messages locally, by printing to stderr.
+ */
+const localReport = async (title /*:string*/, messages /*:Array<Message>*/) => {
+    console.log();
+    console.log(chalk.yellow(`[[ ${title} ]]`));
+    console.log();
+    const fileCache /*: {[key: string]: Array<string>}*/ = {};
+    const getFile = (filePath) => {
+        if (!fileCache[filePath]) {
+            const ext = path.extname(filePath).slice(1);
+            fileCache[filePath] = highlight(fs.readFileSync(filePath, 'utf8'), {
+                language: ext,
+                ignoreIllegals: true,
+            }).split('\n');
+        }
+        return fileCache[filePath];
+    };
+    const byFile /*:{[key: string]: number}*/ = {};
+    messages.forEach((message) => {
+        const lines = getFile(message.path);
+        const lineStart = Math.max(message.start.line - 3, 0);
+        const indexStart = lineStart + 1;
+        const context = lines.slice(lineStart, message.end.line + 2);
+        if (!byFile[message.path]) {
+            byFile[message.path] = 1;
+        } else {
+            byFile[message.path] += 1;
+        }
+        console.error(
+            ':error:',
+            chalk.cyan(
+                `${message.path}:${message.start.line}:${message.start.column}`,
+            ),
+        );
+        console.error(message.message);
+        console.error(
+            '\n' +
+                context
+                    .map(
+                        (line, i) =>
+                            `${chalk.dim(indexStart + i + ':')}${
+                                indexStart + i >= message.start.line &&
+                                indexStart + i <= message.end.line
+                                    ? chalk.red('>')
+                                    : ' '
+                            } ${line}`,
+                    )
+                    .join('\n') +
+                '\n',
+        );
+    });
+    const files = Object.keys(byFile);
+    if (files.length > 1) {
+        console.error(chalk.yellow(`Issues by file`));
+        console.error();
+        for (const file of files) {
+            console.error(`${byFile[file]} in ${chalk.cyan(file)}`);
+        }
+    }
+
+    console.error(chalk.yellow(`${messages.length} total issues for ${title}`));
+};
+
+const removeWorkspace = (path /*: string*/) => {
+    // To appease flow
+    if (!GITHUB_WORKSPACE) {
+        return path;
+    }
+    if (path.startsWith(GITHUB_WORKSPACE)) {
+        return path.substring(GITHUB_WORKSPACE.length + 1);
+    }
+    return path;
+};
+
+/**
+ * Report out these errors to github, by making a new "check" and uploading
+ * the messages as annotations.
+ */
+const githubReport = async (
+    title /*: string*/,
+    token /*: string*/,
+    messages /*: Array<Message>*/,
+) => {
+    /* flow-uncovered-block */
+    const {GitHub, context} = __webpack_require__(1469);
+    const {owner, repo} /*: {owner: string, repo: string}*/ = context.repo;
+    const client = new GitHub(token, {});
+    const headSha = context.payload.pull_request.head.sha;
+    const check = await client.checks.create({
+        owner,
+        repo,
+        started_at: new Date(),
+        name: title,
+        head_sha: headSha,
+    });
+    /* end flow-uncovered-block */
+    const annotations = messages.map((message) => ({
+        path: removeWorkspace(message.path),
+        start_line: message.start.line,
+        end_line: message.end.line,
+        annotation_level: message.annotationLevel,
+        message: message.message,
+    }));
+    let errorCount = 0;
+    let warningCount = 0;
+    messages.forEach((message) => {
+        if (message.annotationLevel === 'failure') {
+            errorCount += 1;
+        } else {
+            warningCount += 1;
+        }
+    });
+
+    // The github checks api has a limit of 50 annotations per call
+    // (https://developer.github.com/v3/checks/runs/#output-object)
+    while (annotations.length > 0) {
+        // take the first 50, removing them from the list
+        const subset = annotations.splice(0, 50);
+        /* flow-uncovered-block */
+        await client.checks.update({
+            owner,
+            repo,
+            check_run_id: check.data.id,
+            completed_at: new Date(),
+            status: 'completed',
+            conclusion: errorCount > 0 ? 'failure' : 'success',
+            output: {
+                title: title,
+                summary: `${errorCount} error(s), ${warningCount} warning(s) found`,
+                annotations: subset,
+            },
+        });
+        /* end flow-uncovered-block */
+    }
+};
+
+const makeReport = (title /*: string*/, messages /*: Array<Message>*/) => {
+    if (!messages.length) {
+        console.log(`${title}: No errors`);
+        return;
+    }
+    if (GITHUB_TOKEN) {
+        return githubReport(title, GITHUB_TOKEN, messages);
+    } else {
+        return localReport(title, messages);
+    }
+};
+
+module.exports = makeReport;
 
 
 /***/ }),
@@ -79963,196 +80224,6 @@ module.exports = function(hljs) {
 
 /***/ }),
 
-/***/ 4836:
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-// @flow
-
-/**
- * The goal of this "action runner" is to allow running "locally"
- * or in a github action.
- *
- * Local running writes to stdout
- * Github running creates a github check.
- *
- * And we distinguish between the two by the presence or absence of
- * the GITHUB_TOKEN env variable.
- */
-
-const {GITHUB_TOKEN, GITHUB_WORKSPACE} = process.env;
-const fs = __webpack_require__(5747);
-const path = __webpack_require__(5622);
-const chalk = __webpack_require__(1843);
-/* flow-uncovered-block */
-// TODO(jared): Strip this out somehow to make this lighter weight
-const highlight /*: (string, {language: string, ignoreIllegals: boolean}) => string */ = __webpack_require__(3227)
-    .highlight;
-/* end flow-uncovered-block */
-
-/*::
-export type Message = {
-    message: string,
-    start: {line: number, column: number},
-    end: {line: number, column: number},
-    annotationLevel: 'failure' | 'warning',
-    path: string,
-}
-*/
-
-/**
- * Report out these error messages locally, by printing to stderr.
- */
-const localReport = async (title /*:string*/, messages /*:Array<Message>*/) => {
-    console.log();
-    console.log(chalk.yellow(`[[ ${title} ]]`));
-    console.log();
-    const fileCache /*: {[key: string]: Array<string>}*/ = {};
-    const getFile = (filePath) => {
-        if (!fileCache[filePath]) {
-            const ext = path.extname(filePath).slice(1);
-            fileCache[filePath] = highlight(fs.readFileSync(filePath, 'utf8'), {
-                language: ext,
-                ignoreIllegals: true,
-            }).split('\n');
-        }
-        return fileCache[filePath];
-    };
-    const byFile /*:{[key: string]: number}*/ = {};
-    messages.forEach((message) => {
-        const lines = getFile(message.path);
-        const lineStart = Math.max(message.start.line - 3, 0);
-        const indexStart = lineStart + 1;
-        const context = lines.slice(lineStart, message.end.line + 2);
-        if (!byFile[message.path]) {
-            byFile[message.path] = 1;
-        } else {
-            byFile[message.path] += 1;
-        }
-        console.error(
-            ':error:',
-            chalk.cyan(
-                `${message.path}:${message.start.line}:${message.start.column}`,
-            ),
-        );
-        console.error(message.message);
-        console.error(
-            '\n' +
-                context
-                    .map(
-                        (line, i) =>
-                            `${chalk.dim(indexStart + i + ':')}${
-                                indexStart + i >= message.start.line &&
-                                indexStart + i <= message.end.line
-                                    ? chalk.red('>')
-                                    : ' '
-                            } ${line}`,
-                    )
-                    .join('\n') +
-                '\n',
-        );
-    });
-    const files = Object.keys(byFile);
-    if (files.length > 1) {
-        console.error(chalk.yellow(`Issues by file`));
-        console.error();
-        for (const file of files) {
-            console.error(`${byFile[file]} in ${chalk.cyan(file)}`);
-        }
-    }
-
-    console.error(chalk.yellow(`${messages.length} total issues for ${title}`));
-};
-
-const removeWorkspace = (path /*: string*/) => {
-    // To appease flow
-    if (!GITHUB_WORKSPACE) {
-        return path;
-    }
-    if (path.startsWith(GITHUB_WORKSPACE)) {
-        return path.substring(GITHUB_WORKSPACE.length + 1);
-    }
-    return path;
-};
-
-/**
- * Report out these errors to github, by making a new "check" and uploading
- * the messages as annotations.
- */
-const githubReport = async (
-    title /*: string*/,
-    token /*: string*/,
-    messages /*: Array<Message>*/,
-) => {
-    /* flow-uncovered-block */
-    const {GitHub, context} = __webpack_require__(1469);
-    const {owner, repo} /*: {owner: string, repo: string}*/ = context.repo;
-    const client = new GitHub(token, {});
-    const headSha = context.payload.pull_request.head.sha;
-    const check = await client.checks.create({
-        owner,
-        repo,
-        started_at: new Date(),
-        name: title,
-        head_sha: headSha,
-    });
-    /* end flow-uncovered-block */
-    const annotations = messages.map((message) => ({
-        path: removeWorkspace(message.path),
-        start_line: message.start.line,
-        end_line: message.end.line,
-        annotation_level: message.annotationLevel,
-        message: message.message,
-    }));
-    let errorCount = 0;
-    let warningCount = 0;
-    messages.forEach((message) => {
-        if (message.annotationLevel === 'failure') {
-            errorCount += 1;
-        } else {
-            warningCount += 1;
-        }
-    });
-
-    // The github checks api has a limit of 50 annotations per call
-    // (https://developer.github.com/v3/checks/runs/#output-object)
-    while (annotations.length > 0) {
-        // take the first 50, removing them from the list
-        const subset = annotations.splice(0, 50);
-        /* flow-uncovered-block */
-        await client.checks.update({
-            owner,
-            repo,
-            check_run_id: check.data.id,
-            completed_at: new Date(),
-            status: 'completed',
-            conclusion: errorCount > 0 ? 'failure' : 'success',
-            output: {
-                title: title,
-                summary: `${errorCount} error(s), ${warningCount} warning(s) found`,
-                annotations: subset,
-            },
-        });
-        /* end flow-uncovered-block */
-    }
-};
-
-const makeReport = (title /*: string*/, messages /*: Array<Message>*/) => {
-    if (!messages.length) {
-        console.log(`${title}: No errors`);
-        return;
-    }
-    if (GITHUB_TOKEN) {
-        return githubReport(title, GITHUB_TOKEN, messages);
-    } else {
-        return localReport(title, messages);
-    }
-};
-
-module.exports = makeReport;
-
-
-/***/ }),
-
 /***/ 4843:
 /***/ (function(module) {
 
@@ -81082,42 +81153,6 @@ webpackEmptyAsyncContext.keys = function() { return []; };
 webpackEmptyAsyncContext.resolve = webpackEmptyAsyncContext;
 module.exports = webpackEmptyAsyncContext;
 webpackEmptyAsyncContext.id = 4884;
-
-/***/ }),
-
-/***/ 4885:
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-// @flow
-const execProm = __webpack_require__(6738);
-const path = __webpack_require__(5622);
-const fs = __webpack_require__(5747);
-
-/**
- * This lists the files that have changed when compared to `base` (a git ref),
- * limited to the files that are a descendent of `cwd`.
- */
-const gitChangedFiles = async (
-    base /*:string*/,
-    cwd /*:string*/,
-) /*: Promise<Array<string>>*/ => {
-    cwd = path.resolve(cwd);
-    const {stdout, stderr} = await execProm(
-        `git diff --name-only ${base} --relative`,
-        {cwd, encoding: 'utf8', rejectOnError: true},
-    );
-    return (
-        stdout
-            .split('\n')
-            .filter(Boolean)
-            .map(name => path.join(cwd, name))
-            // Filter out paths that were deleted
-            .filter(path => fs.existsSync(path))
-    );
-};
-
-module.exports = gitChangedFiles;
-
 
 /***/ }),
 
@@ -86313,6 +86348,42 @@ function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj;
     }
   }
 });
+
+/***/ }),
+
+/***/ 5042:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+// @flow
+const execProm = __webpack_require__(5822);
+const path = __webpack_require__(5622);
+const fs = __webpack_require__(5747);
+
+/**
+ * This lists the files that have changed when compared to `base` (a git ref),
+ * limited to the files that are a descendent of `cwd`.
+ */
+const gitChangedFiles = async (
+    base /*:string*/,
+    cwd /*:string*/,
+) /*: Promise<Array<string>>*/ => {
+    cwd = path.resolve(cwd);
+    const { stdout } = await execProm(
+        `git diff --name-only ${base} --relative`,
+        { cwd, encoding: 'utf8', rejectOnError: true },
+    );
+    return (
+        stdout
+            .split('\n')
+            .filter(Boolean)
+            .map((name) => path.join(cwd, name))
+            // Filter out paths that were deleted
+            .filter((path) => fs.existsSync(path))
+    );
+};
+
+module.exports = gitChangedFiles;
+
 
 /***/ }),
 
@@ -94877,6 +94948,54 @@ function inherits(child, parent) {
 
 /***/ }),
 
+/***/ 5822:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+// @flow
+/**
+ * A simple promisified version of child_process.exec, so we can `await` it
+ */
+const {exec} = __webpack_require__(3129);
+
+const bufferToString = (input /*: Buffer | string*/) /*: string*/ => {
+    if (typeof input === 'string') {
+        return input;
+    } else {
+        return input.toString('utf8');
+    }
+};
+
+const execProm = (
+    command /*: string*/,
+    {rejectOnError, ...options} /*: {rejectOnError: boolean} & mixed */ = {},
+) /*: Promise<{err: ?Error, stdout: string, stderr: string}>*/ =>
+    new Promise((res, rej) =>
+        exec(
+            command,
+            // $FlowFixMe
+            options,
+            (err, stdout, stderr) =>
+                err
+                    ? rejectOnError
+                        ? rej(err)
+                        : res({
+                              err,
+                              stdout: bufferToString(stdout),
+                              stderr: bufferToString(stderr),
+                          })
+                    : res({
+                          err: null,
+                          stdout: bufferToString(stdout),
+                          stderr: bufferToString(stderr),
+                      }),
+        ),
+    );
+
+module.exports = execProm;
+
+
+/***/ }),
+
 /***/ 5849:
 /***/ (function(__unusedmodule, exports) {
 
@@ -101473,54 +101592,6 @@ module.exports = arrayEach;
 
 /***/ }),
 
-/***/ 6738:
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-// @flow
-/**
- * A simple promisified version of child_process.exec, so we can `await` it
- */
-const {exec} = __webpack_require__(3129);
-
-const bufferToString = (input /*: Buffer | string*/) /*: string*/ => {
-    if (typeof input === 'string') {
-        return input;
-    } else {
-        return input.toString('utf8');
-    }
-};
-
-const execProm = (
-    command /*: string*/,
-    {rejectOnError, ...options} /*: {rejectOnError: boolean} & mixed */ = {},
-) /*: Promise<{err: ?Error, stdout: string, stderr: string}>*/ =>
-    new Promise((res, rej) =>
-        exec(
-            command,
-            // $FlowFixMe
-            options,
-            (err, stdout, stderr) =>
-                err
-                    ? rejectOnError
-                        ? rej(err)
-                        : res({
-                              err,
-                              stdout: bufferToString(stdout),
-                              stderr: bufferToString(stderr),
-                          })
-                    : res({
-                          err: null,
-                          stdout: bufferToString(stdout),
-                          stderr: bufferToString(stderr),
-                      }),
-        ),
-    );
-
-module.exports = execProm;
-
-
-/***/ }),
-
 /***/ 6740:
 /***/ (function(module) {
 
@@ -104849,76 +104920,6 @@ module.exports = function(hljs) {
     ]
   };
 };
-
-/***/ }),
-
-/***/ 7182:
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-// @flow
-/**
- * This is used to determine what the "base" branch for the current work is.
- *
- * - If the `GITHUB_BASE_REF` env variable is present, then we're running
- *   under Github Actions, and we can just use that. If this is being run
- *   locally, then it's a bit more tricky to determine the "base" for this
- *   branch.
- * - If this branch hasn't yet been pushed to github (e.g. the "upstream" is
- *   something local), then use the upstream.
- * - Otherwise, go back through the commits until we find a commit that is part
- *   of another branch, that's either master, develop, or a feature/ branch.
- *   TODO(jared): Consider using the github pull-request API (if we're online)
- *   to determine the base branch.
- */
-const execProm = __webpack_require__(6738);
-
-const getBaseRef = async (head /*:string*/ = 'HEAD') => {
-    if (process.env.GITHUB_BASE_REF) {
-        return `refs/remotes/origin/${process.env.GITHUB_BASE_REF}`;
-    } else {
-        let { stdout: upstream } = await execProm(
-            `git rev-parse --abbrev-ref '${head}@{upstream}'`,
-        );
-        upstream = upstream.trim();
-
-        // if upstream is local and not empty, use that.
-        if (upstream && !upstream.trim().startsWith('origin/')) {
-            return `refs/heads/${upstream}`;
-        }
-        let { stdout: headRef } = await execProm(
-            `git rev-parse --abbrev-ref ${head}`,
-        );
-        headRef = headRef.trim();
-        for (let i = 1; i < 100; i++) {
-            const { stdout } = await execProm(
-                `git branch --contains ${head}~${i} --format='%(refname)'`,
-            );
-            let lines = stdout.split('\n').filter(Boolean);
-            lines = lines.filter((line) => line !== `refs/heads/${headRef}`);
-
-            // Note (Lilli): When running our actions locally, we want to be a little more
-            // aggressive in choosing a baseRef, going back to a shared commit on only `develop`,
-            // `master`, feature or release branches, so that we can cover more commits. In case,
-            // say, I create a bunch of experimental, first-attempt, throw-away branches that
-            // share commits higher in my stack...
-            for (const line of lines) {
-                if (
-                    line === 'refs/heads/develop' ||
-                    line === 'refs/heads/master' ||
-                    line.startsWith('refs/heads/feature/') ||
-                    line.startsWith('refs/heads/release/')
-                ) {
-                    return line;
-                }
-            }
-        }
-        // If all else fails, just use upstream
-        return `${head}@{upstream}`;
-    }
-};
-
-module.exports = getBaseRef;
-
 
 /***/ }),
 

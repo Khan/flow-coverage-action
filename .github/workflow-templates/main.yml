@@ -1,0 +1,23 @@
+name: Run on itself!
+'on':
+  - pull_request
+
+setup:
+  checkout:
+    - uses: actions/checkout@v1
+  yarn:
+    - run: yarn
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - id: flow-coverage
+        uses: Khan/flow-coverage-action@refactor
+        setup: yarn
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+      - id: flow
+        run: yarn flow
+        setup: yarn
+
