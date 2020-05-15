@@ -2666,8 +2666,8 @@ const getFlowBin = () /*:string*/ => {
     if (process.env['INPUT_FLOW-BIN']) {
         return process.env['INPUT_FLOW-BIN'];
     }
-    const guess = __webpack_require__.ab + "flow";
-    if (fs.existsSync(__webpack_require__.ab + "flow")) {
+    const guess = 'node_modules/.bin/flow';
+    if (fs.existsSync(guess)) {
         return guess;
     }
     console.error('No flow-bin found (pass in as an input)');

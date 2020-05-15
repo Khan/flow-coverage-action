@@ -44,7 +44,7 @@ const getFlowBin = () /*:string*/ => {
     if (process.env['INPUT_FLOW-BIN']) {
         return process.env['INPUT_FLOW-BIN'];
     }
-    const guess = path.resolve('node_modules/.bin/flow');
+    const guess = 'node_modules/.bin/flow';
     if (fs.existsSync(guess)) {
         return guess;
     }
