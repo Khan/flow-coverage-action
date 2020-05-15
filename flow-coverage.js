@@ -15,6 +15,8 @@ require('@babel/register'); // flow-uncovered-line
 const sendReport = require('actions-utils/send-report');
 const getBaseRef = require('actions-utils/get-base-ref');
 const gitChangedFiles = require('actions-utils/git-changed-files');
+const fs = require('fs');
+const path = require('path');
 
 const checkFile = require('./flow-coverage-linter');
 
@@ -38,7 +40,7 @@ async function run(flowBin) {
     await sendReport('Flow-coverage', allAnnotations);
 }
 
-const getFlowBin = () => {
+const getFlowBin = () /*:string*/ => {
     if (process.env['INPUT_FLOW-BIN']) {
         return process.env['INPUT_FLOW-BIN'];
     }
@@ -48,8 +50,10 @@ const getFlowBin = () => {
     }
     console.error('No flow-bin found (pass in as an input)');
     process.exit(1);
+    throw new Error();
 };
 
+// flow-next-uncovered-line
 run(getFlowBin()).catch((err) => {
     console.error(err); // flow-uncovered-line
     process.exit(1);
