@@ -2702,16 +2702,28 @@ run(getFlowBin()).catch((err) => {
  *   TODO(jared): Consider using the github pull-request API (if we're online)
  *   to determine the base branch.
  */
-const { execSync } = __webpack_require__(3129);
+const { execSync, spawnSync } = __webpack_require__(3129);
 
-const getBaseRef = async (head /*:string*/ = 'HEAD') => {
+const checkRef = (ref) => spawnSync('git', ['rev-parse', ref]).status === 0;
+
+const validateBaseRef = (baseRef /*:string*/) => {
+    // It's locally accessible!
+    if (checkRef(baseRef)) {
+        return baseRef;
+    }
+    // If it's not locally accessible, then it's probably a remote branch
+    const remote = `refs/remotes/origin/${baseRef}`;
+    if (checkRef(remote)) {
+        return remote;
+    }
+    // Otherwise return null - no valid ref provided
+    return null;
+};
+
+const getBaseRef = (head /*:string*/ = 'HEAD') => {
     const { GITHUB_BASE_REF } = process.env;
     if (GITHUB_BASE_REF) {
-        if (GITHUB_BASE_REF.startsWith('refs/')) {
-            return GITHUB_BASE_REF;
-        } else {
-            return `refs/remotes/origin/${GITHUB_BASE_REF}`;
-        }
+        return validateBaseRef(GITHUB_BASE_REF);
     } else {
         let upstream = execSync(
             `git rev-parse --abbrev-ref '${head}@{upstream}'`,
@@ -2764,6 +2776,7 @@ const getBaseRef = async (head /*:string*/ = 'HEAD') => {
 };
 
 module.exports = getBaseRef;
+module.exports.validateBaseRef = validateBaseRef;
 
 
 /***/ }),
@@ -86467,7 +86480,7 @@ const getIgnoredPatterns = (fileContents) => {
             const [pattern, ...attributes] = line.trim().split(' ');
             if (
                 attributes.includes('binary') ||
-                attributes.inludes('linguist-generated=true')
+                attributes.includes('linguist-generated=true')
             ) {
                 return pattern;
             }
