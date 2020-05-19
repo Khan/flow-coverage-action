@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - id: flow-coverage
-        uses: Khan/flow-coverage-action@refactor
+        uses: Khan/flow-coverage-action@master
         setup: yarn
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'

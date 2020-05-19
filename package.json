@@ -14,6 +14,7 @@
         "@babel/register": "^7.9.0",
         "@zeit/ncc": "^0.22.1",
         "actions-utils": "Khan/actions-utils#7bd824543f23b90b3908caae0a1ef1088d7ea67f",
+        "actions-workflow-tools": "Khan/actions-workflow-tools",
         "chalk": "^4.0.0",
         "cli-highlight": "^2.1.4",
         "flow-bin": "^0.123.0",
