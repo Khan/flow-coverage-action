@@ -13,7 +13,7 @@
         "@babel/core": "^7.9.6",
         "@babel/register": "^7.9.0",
         "@zeit/ncc": "^0.22.1",
-        "actions-utils": "Khan/actions-utils#7bd824543f23b90b3908caae0a1ef1088d7ea67f",
+        "actions-utils": "Khan/actions-utils#1c1003b530e083a11dae6f7447a2342a3121ea7a",
         "actions-workflow-tools": "Khan/actions-workflow-tools",
         "chalk": "^4.0.0",
         "cli-highlight": "^2.1.4",
