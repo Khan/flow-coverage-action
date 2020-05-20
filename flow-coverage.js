@@ -16,7 +16,6 @@ const sendReport = require('actions-utils/send-report');
 const getBaseRef = require('actions-utils/get-base-ref');
 const gitChangedFiles = require('actions-utils/git-changed-files');
 const fs = require('fs');
-const path = require('path');
 
 const checkFile = require('./flow-coverage-linter');
 
@@ -27,7 +26,7 @@ async function run(flowBin) {
         return;
     }
     const files = await gitChangedFiles(baseRef, '.');
-    const jsFiles = files.filter((file) => file.endsWith('.js'));
+    const jsFiles = files.filter(file => file.endsWith('.js'));
     if (!jsFiles.length) {
         console.log('No changed files');
         return;
@@ -37,7 +36,7 @@ async function run(flowBin) {
         const annotations = await checkFile(flowBin, file);
         allAnnotations.push(...annotations);
     }
-    await sendReport('Flow-coverage', allAnnotations);
+    await sendReport('Flow Coverage', allAnnotations);
 }
 
 const getFlowBin = () /*:string*/ => {
@@ -54,7 +53,7 @@ const getFlowBin = () /*:string*/ => {
 };
 
 // flow-next-uncovered-line
-run(getFlowBin()).catch((err) => {
+run(getFlowBin()).catch(err => {
     console.error(err); // flow-uncovered-line
     process.exit(1);
 });
