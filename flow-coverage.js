@@ -27,7 +27,7 @@ async function run(flowBin) {
         return;
     }
     const files = await gitChangedFiles(baseRef, '.');
-    const jsFiles = files.filter((file) => file.endsWith('.js'));
+    const jsFiles = files.filter(file => file.endsWith('.js'));
     if (!jsFiles.length) {
         console.log('No changed files');
         return;
@@ -54,7 +54,7 @@ const getFlowBin = () /*:string*/ => {
 };
 
 // flow-next-uncovered-line
-run(getFlowBin()).catch((err) => {
+run(getFlowBin()).catch(err => {
     console.error(err); // flow-uncovered-line
     process.exit(1);
 });
