@@ -16,7 +16,6 @@ const sendReport = require('actions-utils/send-report');
 const getBaseRef = require('actions-utils/get-base-ref');
 const gitChangedFiles = require('actions-utils/git-changed-files');
 const fs = require('fs');
-const path = require('path');
 
 const checkFile = require('./flow-coverage-linter');
 
