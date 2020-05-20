@@ -37,7 +37,7 @@ async function run(flowBin) {
         const annotations = await checkFile(flowBin, file);
         allAnnotations.push(...annotations);
     }
-    await sendReport('Flow-coverage', allAnnotations);
+    await sendReport('Flow Coverage', allAnnotations);
 }
 
 const getFlowBin = () /*:string*/ => {
