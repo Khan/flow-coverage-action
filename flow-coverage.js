@@ -20,6 +20,7 @@ const fs = require('fs');
 const checkFile = require('./flow-coverage-linter');
 
 async function run(flowBin) {
+    const subtitle = process.env['INPUT_CHECK-RUN-SUBTITLE'];
     const baseRef = await getBaseRef();
     if (!baseRef) {
         console.log('Unable to determine base ref');
@@ -36,7 +37,7 @@ async function run(flowBin) {
         const annotations = await checkFile(flowBin, file);
         allAnnotations.push(...annotations);
     }
-    await sendReport('Flow Coverage', allAnnotations);
+    await sendReport(`Flow Coverage${subtitle ? '- ' + subtitle : ''}`, allAnnotations);
 }
 
 const getFlowBin = () /*:string*/ => {
