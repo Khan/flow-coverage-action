@@ -21,12 +21,14 @@ const checkFile = require('./flow-coverage-linter');
 
 async function run(flowBin) {
     const subtitle = process.env['INPUT_CHECK-RUN-SUBTITLE'];
+    const workingDirectory = process.env['INPUT_CUSTOM-WORKING-DIRECTORY'];
+
     const baseRef = await getBaseRef();
     if (!baseRef) {
         console.log('Unable to determine base ref');
         return;
     }
-    const files = await gitChangedFiles(baseRef, '.');
+    const files = await gitChangedFiles(baseRef, workingDirectory || '.');
     const jsFiles = files.filter(file => file.endsWith('.js'));
     if (!jsFiles.length) {
         console.log('No changed files');
@@ -37,7 +39,7 @@ async function run(flowBin) {
         const annotations = await checkFile(flowBin, file);
         allAnnotations.push(...annotations);
     }
-    await sendReport(`Flow Coverage${subtitle ? '- ' + subtitle : ''}`, allAnnotations);
+    await sendReport(`Flow Coverage${subtitle ? ' - ' + subtitle : ''}`, allAnnotations);
 }
 
 const getFlowBin = () /*:string*/ => {
