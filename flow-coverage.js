@@ -14,6 +14,7 @@ require('@babel/register'); // flow-uncovered-line
 
 const sendReport = require('actions-utils/send-report');
 const getBaseRef = require('actions-utils/get-base-ref');
+const {cannedGithubErrorMessage} = require('actions-utils/get-base-ref');
 const gitChangedFiles = require('actions-utils/git-changed-files');
 const fs = require('fs');
 
@@ -26,6 +27,7 @@ async function run(flowBin) {
     const baseRef = await getBaseRef();
     if (!baseRef) {
         console.log('Unable to determine base ref');
+        console.error(cannedGithubErrorMessage());
         return;
     }
     const files = await gitChangedFiles(baseRef, workingDirectory || '.');
