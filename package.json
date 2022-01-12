@@ -10,7 +10,7 @@
         "format-files": "prettier-eslint --write --config .prettierrc",
         "lint": "./node_modules/.bin/eslint .",
         "test": "jest",
-        "dist": "ncc build flow-coverage.js"
+        "dist": "ncc build action.js"
     },
     "devDependencies": {
         "@actions/github": "^2.1.1",
