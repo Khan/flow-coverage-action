@@ -38,7 +38,7 @@ jobs:
         run: >-
           node ./node_modules/actions-utils/list-changed-files.js | grep
           '.*\.js$' | xargs npm run -s format-files
-      - name: Rebuild our "dist" file
+      - name: Rebuild our distributed files
         run: yarn run dist
       - uses: Khan/autofix-commit-action@main
         env:
