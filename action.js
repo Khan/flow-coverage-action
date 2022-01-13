@@ -9,8 +9,6 @@
  * UI).
  */
 
-require('@babel/register');
-
 const getBaseRef = require('actions-utils/get-base-ref');
 const {cannedGithubErrorMessage} = require('actions-utils/get-base-ref');
 const gitChangedFiles = require('actions-utils/git-changed-files');

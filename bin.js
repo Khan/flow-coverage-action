@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 // @flow
-require('@babel/register');
 
 const {runFlowCoverage, getFlowBin} = require('./flow-coverage');
 

@@ -14,8 +14,8 @@ const findIgnoredLinesAndPositions = (path, text) => {
     const lines = text.split('\n');
     const ignored /*: {[key: number]: boolean} */ = {};
     const lineOffsets /*: {[key: number]: number} */ = {};
-    const ignoreBlocks = [];
-    const unmatchedBlocks = [];
+    const ignoreBlocks /*: Array<[number, number]> */ = [];
+    const unmatchedBlocks /*: Array<[number, number]> */ = [];
     let ignoring = false;
     let next = false;
     let numLines = 0;
