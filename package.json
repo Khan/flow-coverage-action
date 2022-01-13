@@ -10,7 +10,9 @@
         "format-files": "prettier-eslint --write --config .prettierrc",
         "lint": "./node_modules/.bin/eslint .",
         "test": "jest",
-        "dist": "ncc build action.js"
+        "dist:action": "ncc build action.js -o dist/action",
+        "dist:bin": "ncc build bin.js -o dist/bin",
+        "dist": "npm run dist:action && npm run dist:bin"
     },
     "devDependencies": {
         "@actions/github": "^2.1.1",
