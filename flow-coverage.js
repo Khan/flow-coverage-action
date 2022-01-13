@@ -1,45 +1,36 @@
-#!/usr/bin/env node
 // @flow
 
-/**
- * This action runs `flow` and lints against uncovered expressions.
- *
- * It uses `send-report.js` to support both running locally (reporting to
- * stdout) and under Github Actions (adding annotations to files in the GitHub
- * UI).
- */
-
-// $FlowFixMe: shhhhh
-require('@babel/register'); // flow-uncovered-line
-
-const sendReport = require('actions-utils/send-report');
-const getBaseRef = require('actions-utils/get-base-ref');
-const {cannedGithubErrorMessage} = require('actions-utils/get-base-ref');
-const gitChangedFiles = require('actions-utils/git-changed-files');
 const fs = require('fs');
-
+const sendReport = require('actions-utils/send-report');
 const checkFile = require('./flow-coverage-linter');
 
-async function run(flowBin) {
-    const subtitle = process.env['INPUT_CHECK-RUN-SUBTITLE'];
-    const workingDirectory = process.env['INPUT_CUSTOM-WORKING-DIRECTORY'];
-
-    const baseRef = await getBaseRef();
-    if (!baseRef) {
-        console.log('Unable to determine base ref');
-        console.error(cannedGithubErrorMessage());
-        return;
-    }
-    const files = await gitChangedFiles(baseRef, workingDirectory || '.');
-    const jsFiles = files.filter(file => file.endsWith('.js'));
-    if (!jsFiles.length) {
-        console.log('No changed files');
-        return;
-    }
+async function runFlowCoverage(
+    subtitle /*: ?string*/,
+    flowBin /*: string*/,
+    jsFiles /*: Array<string>*/,
+) {
     const allAnnotations = [];
+    console.log(`Checking ${jsFiles.length} files`);
     for (const file of jsFiles) {
-        const annotations = await checkFile(flowBin, file);
-        allAnnotations.push(...annotations);
+        try {
+            const annotations = await checkFile(flowBin, file);
+            allAnnotations.push(...annotations);
+            if (annotations.length) {
+                console.log(` ${file} : ${annotations.length} violations`);
+            } else {
+                process.stdout.write('.');
+            }
+        } catch (err) {
+            console.error(`Failed to check ${file}`);
+            console.error(err);
+            allAnnotations.push({
+                message: `Failed to check ${file}. ${err.message}\n${err.stack}`,
+                start: {line: 1, column: 1},
+                end: {line: 1, column: 1},
+                annotationLevel: 'failure',
+                path: file,
+            });
+        }
     }
     await sendReport(`Flow Coverage${subtitle ? ' - ' + subtitle : ''}`, allAnnotations);
 }
@@ -57,8 +48,4 @@ const getFlowBin = () /*:string*/ => {
     throw new Error();
 };
 
-// flow-next-uncovered-line
-run(getFlowBin()).catch(err => {
-    console.error(err); // flow-uncovered-line
-    process.exit(1);
-});
+module.exports = {runFlowCoverage, getFlowBin};

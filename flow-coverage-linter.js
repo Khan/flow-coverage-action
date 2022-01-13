@@ -1,5 +1,6 @@
 // @flow
 
+const os = require('os');
 const {execSync} = require('child_process');
 const path = require('path');
 
@@ -68,13 +69,7 @@ const collectWarnings = (fileName, lineStats, uncoveredLocs) => {
         message: string,
         offset: number,
     }> */ = [];
-    const {
-        ignoredLines,
-        ignoredBlocks,
-        numLines,
-        lineOffsets,
-        unmatchedBlocks,
-    } = lineStats;
+    const {ignoredLines, ignoredBlocks, numLines, lineOffsets, unmatchedBlocks} = lineStats;
     const threshold = 0.8;
 
     unmatchedBlocks.forEach(([blockStart, blockEnd]) => {
@@ -102,9 +97,7 @@ const collectWarnings = (fileName, lineStats, uncoveredLocs) => {
                     start,
                     end,
                     annotationLevel: 'failure',
-                    message: `The expression from ${start.line}:${
-                        start.column
-                    }-${
+                    message: `The expression from ${start.line}:${start.column}-${
                         end.column
                         // Note that the `${''}` trick is so that it won't trip the regex that's looking for these comments
                     } is not covered by flow! If it's unavoidable, put '// flow-${''}uncovered-line' at the end of the line`,
@@ -126,11 +119,7 @@ const collectWarnings = (fileName, lineStats, uncoveredLocs) => {
                     start,
                     end,
                     annotationLevel: 'failure',
-                    message: `The expression from ${start.line}:${
-                        start.column
-                    }-${end.line}:${
-                        end.column
-                    } is not covered by flow! If it's unavoidable, surround the expression in '/* flow-uncovered-block */' and '/* end flow-uncovered-block */'`,
+                    message: `The expression from ${start.line}:${start.column}-${end.line}:${end.column} is not covered by flow! If it's unavoidable, surround the expression in '/* flow-uncovered-block */' and '/* end flow-uncovered-block */'`,
                     offset: start.offset,
                 });
             }
@@ -140,11 +129,7 @@ const collectWarnings = (fileName, lineStats, uncoveredLocs) => {
     let currentBlock /*: ?[number, number] */ = ignoredBlocks.shift();
     for (let line = 1; line <= numLines; line++) {
         if (ignoredLines[line] && !errorExists[line]) {
-            if (
-                currentBlock &&
-                currentBlock[0] <= line &&
-                line <= currentBlock[1]
-            ) {
+            if (currentBlock && currentBlock[0] <= line && line <= currentBlock[1]) {
                 passable += 1;
             } else {
                 const offset = lineOffsets[line] - 1;
@@ -169,9 +154,7 @@ const collectWarnings = (fileName, lineStats, uncoveredLocs) => {
                     annotationLevel: 'failure',
                     message: `More than ${Math.floor(
                         threshold * 100,
-                    )}% of lines in the 'flow-uncovered-block' from lines ${
-                        currentBlock[0]
-                    }-${
+                    )}% of lines in the 'flow-uncovered-block' from lines ${currentBlock[0]}-${
                         currentBlock[1]
                     } are covered by flow! You should remove this comment from the entire block and instead cover individual lines using '// flow-${''}uncovered-line'.`,
                     offset: offset,
@@ -198,17 +181,13 @@ type CoverageInfo = {|
     |}
 */
 
-const getCoverage = (flowBin, filePath) => {
-    const stdout = execSync(
-        path.resolve(flowBin) + ` coverage --json ${filePath}`,
-    ).toString('utf8');
-    const data /*: CoverageInfo */ = JSON.parse(stdout); // flow-uncovered-line
-
+const getCoverage = (flowBin, filePath, tmpfile) => {
+    execSync(path.resolve(flowBin) + ` coverage --json ${filePath} > ${tmpfile}`);
+    const data /*: CoverageInfo */ = JSON.parse(fs.readFileSync(tmpfile, 'utf8')); // flow-uncovered-line
     return data;
 };
 
-const isUncoveredFile = sourceText =>
-    sourceText.split('\n').includes('/* flow-uncovered-file */');
+const isUncoveredFile = sourceText => sourceText.split('\n').includes('/* flow-uncovered-file */');
 
 const checkFile = (flowBin /*: string */, filePath /*: string */) => {
     const sourceText = fs.readFileSync(filePath).toString('utf8');
@@ -223,21 +202,17 @@ const checkFile = (flowBin /*: string */, filePath /*: string */) => {
         return [];
     }
 
-    const data = getCoverage(flowBin, filePath);
+    const tmpdir = os.tmpdir();
+    const tmpfile = tmpdir + '/buffer.txt';
+
+    const data = getCoverage(flowBin, filePath, tmpfile);
     if (!data.expressions.uncovered_count) {
         // All clear!
         return [];
     }
 
-    const ignoredLinesAndPositions = findIgnoredLinesAndPositions(
-        filePath,
-        sourceText,
-    );
-    return collectWarnings(
-        filePath,
-        ignoredLinesAndPositions,
-        data.expressions.uncovered_locs,
-    );
+    const ignoredLinesAndPositions = findIgnoredLinesAndPositions(filePath, sourceText);
+    return collectWarnings(filePath, ignoredLinesAndPositions, data.expressions.uncovered_locs);
 };
 
 module.exports = checkFile;

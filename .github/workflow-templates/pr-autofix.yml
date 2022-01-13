@@ -7,8 +7,6 @@ on:
   - pull_request
 
 include:
-  # TODO: maybe something like:
-  # - ../../node_modules/my-shared-setup/_setup.yml
   - _setup.yml
 
 jobs:
@@ -27,7 +25,7 @@ jobs:
       setup: yarn
       run: node ./node_modules/actions-utils/list-changed-files.js | grep '.*\.js$' | xargs npm run -s format-files
 
-    - name: Rebuild our "dist" file
+    - name: Rebuild our distributed files
       setup: yarn
       run: yarn run dist
 
