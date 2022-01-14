@@ -15275,6 +15275,10 @@ async function runFlowCoverage(
             }
         } catch (err) {
             console.error(`Failed to check ${file}`);
+            if (!(err instanceof Error)) {
+                // flow-next-uncovered-line
+                err = new Error(`Unknown error ${err}`);
+            }
             console.error(err);
             allAnnotations.push({
                 message: `Failed to check ${file}. ${err.message}\n${err.stack}`,
