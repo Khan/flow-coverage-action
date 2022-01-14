@@ -10,13 +10,15 @@
         "format-files": "prettier-eslint --write --config .prettierrc",
         "lint": "./node_modules/.bin/eslint .",
         "test": "jest",
-        "dist": "ncc build flow-coverage.js"
+        "dist:action": "ncc build action.js -o dist/action",
+        "dist:bin": "ncc build bin.js -o dist/bin",
+        "dist": "npm run dist:action && npm run dist:bin"
     },
     "devDependencies": {
         "@actions/github": "^2.1.1",
         "@babel/core": "^7.9.6",
         "@babel/register": "^7.9.0",
-        "@zeit/ncc": "^0.22.1",
+        "@zeit/ncc": "0.22.1",
         "actions-utils": "Khan/actions-utils#v1.3.1",
         "actions-workflow-tools": "Khan/actions-workflow-tools#v1.2.5",
         "babel-eslint": "^10.1.0",
@@ -32,6 +34,7 @@
         "prettier-eslint-cli": "^5.0.0"
     },
     "dependencies": {
+        "glob": "^7.2.0",
         "jest": "^26.0.1"
     }
 }
